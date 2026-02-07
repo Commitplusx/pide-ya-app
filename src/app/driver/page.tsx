@@ -20,10 +20,46 @@ export default function DriverPage() {
     const [stats, setStats] = useState({ today: 0 });
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     useEffect(() => {
         fetchHistory();
         inputRef.current?.focus();
     }, []);
+
+    // Smart Search Effect
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (searchQuery.length >= 3) {
+                setIsSearching(true);
+                try {
+                    const { data } = await supabase
+                        .from('clientes')
+                        .select('*')
+                        .or(`nombre.ilike.%${searchQuery}%,telefono.ilike.%${searchQuery}%`)
+                        .limit(5);
+                    setSearchResults(data || []);
+                } catch (error) {
+                    console.error("Search error:", error);
+                } finally {
+                    setIsSearching(false);
+                }
+            } else {
+                setSearchResults([]);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const selectClient = (client: any) => {
+        setPhone(client.telefono);
+        setSearchQuery(""); // Clear search to hide results
+        setSearchResults([]);
+        // Optional: Auto-focus or confirm
+    };
 
     const fetchHistory = async () => {
         const { data } = await supabase
@@ -40,7 +76,14 @@ export default function DriverPage() {
     };
 
     const handleAddStamp = async (count: number) => {
-        if (phone.length < 10) {
+        let cleanPhone = phone.replace(/\D/g, '');
+        // Auto-add +52 if it looks like a 10-digit MX number
+        if (cleanPhone.length === 10) {
+            // Check if we need to add +52 or if database has it.
+            // Best practice: Search for BOTH formats to find the user ID.
+        }
+
+        if (cleanPhone.length < 10) {
             alert("Ingresa un número de 10 dígitos");
             return;
         }
@@ -50,18 +93,23 @@ export default function DriverPage() {
         try {
             let clientId;
 
+            // Smart Lookup: Try exact 10 digits OR +52 version
             const { data: client } = await supabase
                 .from('clientes')
                 .select('id')
-                .eq('telefono', phone)
-                .single();
+                .or(`telefono.eq.${cleanPhone},telefono.eq.+52${cleanPhone}`)
+                .maybeSingle();
 
             if (client) {
                 clientId = client.id;
             } else {
+                // Determine which format to save new users in. 
+                // If existing users have +52, maybe we should save with +52?
+                // For now, let's just save what they typed (10 digits) to avoid conflicts, or standardise?
+                // Let's standardise to 10 digits for new users unless instructed otherwise.
                 const { data: newClient, error: createError } = await supabase
                     .from('clientes')
-                    .insert([{ telefono: phone, nombre: 'Cliente Nuevo' }])
+                    .insert([{ telefono: cleanPhone, nombre: 'Cliente Nuevo' }])
                     .select('id')
                     .single();
 
@@ -87,7 +135,7 @@ export default function DriverPage() {
                 descripcion: description
             }]);
 
-            setLastAction(`${phone} • ${description}`);
+            setLastAction(`${cleanPhone} • ${description}`);
             setStatus("success");
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([50, 30, 50]);
             fetchHistory();
@@ -155,33 +203,83 @@ export default function DriverPage() {
                 </div>
 
                 {/* Input Card - Blanco con borde morado */}
-                <section className="bg-white rounded-3xl p-6 shadow-xl border-2 border-purple-100">
+                <section className="bg-white rounded-3xl p-6 shadow-xl border-2 border-purple-100 relative z-20">
                     <label className="text-xs font-black text-purple-600 uppercase tracking-widest mb-3 block">
                         Identificar Cliente
                     </label>
 
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <Search className="w-5 h-5 text-purple-400" />
+                            <Search className={`w-5 h-5 ${isSearching ? 'text-purple-600 animate-pulse' : 'text-purple-400'}`} />
                         </div>
                         <input
                             ref={inputRef}
-                            type="tel"
-                            placeholder="Número..."
-                            value={phone}
-                            maxLength={10}
-                            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                            className="w-full bg-purple-50 border-2 border-purple-200 rounded-2xl py-4 pl-12 pr-12 text-2xl font-bold text-slate-900 placeholder:text-purple-300 outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all"
+                            type="text"
+                            placeholder="Nombre o Teléfono..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                // Auto-sync phone if it's a number
+                                const nums = e.target.value.replace(/\D/g, '');
+                                if (nums.length === 10) setPhone(nums);
+                                else if (phone && nums.length !== 10) setPhone("");
+                            }}
+                            className="w-full bg-purple-50 border-2 border-purple-200 rounded-2xl py-4 pl-12 pr-12 text-xl font-bold text-slate-900 placeholder:text-purple-300 outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all"
                         />
-                        {phone && (
+                        {searchQuery && (
                             <button
-                                onClick={() => setPhone("")}
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setPhone("");
+                                    setSearchResults([]);
+                                    inputRef.current?.focus();
+                                }}
                                 className="absolute inset-y-0 right-0 pr-4 flex items-center text-purple-400 hover:text-purple-600 transition-colors"
                             >
                                 <X className="w-6 h-6" />
                             </button>
                         )}
+
+                        {/* Search Results Dropdown */}
+                        <AnimatePresence>
+                            {searchResults.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-purple-100 overflow-hidden z-30 max-h-60 overflow-y-auto"
+                                >
+                                    {searchResults.map((client) => (
+                                        <button
+                                            key={client.id}
+                                            onClick={() => selectClient(client)}
+                                            className="w-full text-left px-5 py-4 hover:bg-purple-50 transition-colors flex items-center justify-between group border-b border-slate-50 last:border-0"
+                                        >
+                                            <div>
+                                                <p className="font-bold text-slate-800 text-sm group-hover:text-purple-700 transition-colors">
+                                                    {client.nombre || "Sin Nombre"}
+                                                </p>
+                                                <p className="text-xs text-slate-400 font-mono tracking-wide">
+                                                    {client.telefono}
+                                                </p>
+                                            </div>
+                                            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-purple-500" />
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
+                    {phone.length === 10 && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-3 flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg"
+                        >
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-xs font-bold">Cliente Identificado: {phone}</span>
+                        </motion.div>
+                    )}
                 </section>
 
                 {/* Botones de Sellos - Morados y Azules */}

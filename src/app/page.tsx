@@ -39,8 +39,9 @@ export default function Home() {
     const { data: client } = await supabase
       .from('clientes')
       .select('id, nombre')
-      .eq('telefono', phone)
-      .single();
+      .select('id, nombre')
+      .or(`telefono.eq.${phone},telefono.eq.+52${phone}`)
+      .maybeSingle();
 
     if (client) {
       if (client.nombre) setUserName(client.nombre);
@@ -77,8 +78,8 @@ export default function Home() {
       const { data: existingUser } = await supabase
         .from('clientes')
         .select('*')
-        .eq('telefono', phoneNumber)
-        .single();
+        .or(`telefono.eq.${phoneNumber},telefono.eq.+52${phoneNumber}`)
+        .maybeSingle();
 
       // Try restaurants too if client not found
       if (!existingUser) {
