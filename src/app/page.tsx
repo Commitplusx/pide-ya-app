@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { LoyaltyCard } from "@/components/LoyaltyCard";
 import { DynamicQR } from "@/components/DynamicQR";
-import { ShoppingBag, Bell, QrCode, X, Search, Smartphone, ChevronRight } from "lucide-react";
+import { ShoppingBag, Bell, QrCode, X, Search, Smartphone, ChevronRight, LogOut, Package, PartyPopper } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 
@@ -99,7 +99,7 @@ export default function Home() {
   const handleLogout = () => {
     // Clear session
     localStorage.removeItem('pide_ya_session');
-    
+
     // Reset all state
     setPhoneNumber("");
     setUserName("");
@@ -156,7 +156,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-hidden flex flex-col items-center">
+    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans relative overflow-hidden flex flex-col items-center" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
       {/* Background Gradients */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -182,10 +182,11 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      <div className="w-full max-w-md flex flex-col flex-1 relative z-10 px-6 py-6 h-full">
+      {/* Content Container with Safe Area */}
+      <div className="w-full max-w-md flex flex-col flex-1 relative z-10 px-6 h-full" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}>
 
         {/* Header */}
-        <header className="flex items-center justify-between mb-8">
+        <header className="flex items-center justify-between mb-8 pt-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/25">
               <span className="text-white font-black text-sm tracking-tighter">PY</span>
@@ -270,24 +271,24 @@ export default function Home() {
               className="space-y-8"
             >
               {/* User Greeting with Logout */}
-              <div className="glass-card px-4 sm:px-5 py-3 rounded-2xl flex items-center justify-between gap-3">
+              <div className="glass-card px-4 sm:px-5 py-4 rounded-2xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-blue-500/20 flex-shrink-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-md shadow-blue-500/20 flex-shrink-0">
                     {userName ? userName[0].toUpperCase() : 'U'}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-0.5">Bienvenido</p>
-                    <h2 className="text-base sm:text-xl font-bold text-slate-900 truncate">
-                      {userName || `Usuario ${phoneNumber.substring(0, 3)}...`}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-0.5">Bienvenido</p>
+                    <h2 className="text-sm sm:text-lg font-bold text-slate-900 truncate leading-tight">
+                      {userName || `+52 ${phoneNumber}`}
                     </h2>
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="px-3 sm:px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
+                  className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-all flex items-center justify-center flex-shrink-0 group"
+                  title="Cerrar sesión"
                 >
-                  <X className="w-4 h-4" />
-                  <span className="hidden sm:inline">Salir</span>
+                  <LogOut className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
                 </button>
               </div>
 
@@ -309,15 +310,18 @@ export default function Home() {
                     activityLog.map((item: any) => (
                       <div key={item.id} className="glass-card p-4 rounded-2xl flex items-center justify-between group hover:scale-[1.01] transition-transform">
                         <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${item.tipo === 'STAMP'
-                            ? 'bg-orange-50 text-orange-600'
-                            : 'bg-green-50 text-green-600'
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${item.tipo === 'STAMP'
+                            ? 'bg-gradient-to-br from-orange-500 to-pink-500'
+                            : 'bg-gradient-to-br from-green-500 to-emerald-500'
                             }`}>
-                            {item.tipo === 'STAMP' ? '🎁' : '🏆'}
+                            {item.tipo === 'STAMP'
+                              ? <Package className="w-6 h-6 text-white" strokeWidth={2.5} />
+                              : <PartyPopper className="w-6 h-6 text-white" strokeWidth={2.5} />
+                            }
                           </div>
                           <div>
                             <p className="font-bold text-slate-800 text-sm">
-                              {item.tipo === 'STAMP' ? 'Recibiste Puntos' : 'Premio Canjeado'}
+                              {item.tipo === 'STAMP' ? 'Sello Agregado' : 'Envío Gratis Canjeado'}
                             </p>
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
                               {new Date(item.fecha).toLocaleDateString('es-MX', {
