@@ -36,20 +36,37 @@ export default function Home() {
   }, [phoneNumber]);
 
   const fetchUserData = async (phone: string) => {
+    let clientData: { id: string, nombre: string } | null = null;
+
+    // 1. Try finding in 'clientes'
     const { data: client } = await supabase
       .from('clientes')
-      .select('id, nombre')
       .select('id, nombre')
       .or(`telefono.eq.${phone},telefono.eq.+52${phone}`)
       .maybeSingle();
 
     if (client) {
-      if (client.nombre) setUserName(client.nombre);
+      clientData = client;
+    } else {
+      // 2. Try finding in 'restaurantes'
+      const { data: restaurant } = await supabase
+        .from('restaurantes')
+        .select('id, nombre')
+        .or(`telefono.eq.${phone},telefono.eq.+52${phone}`)
+        .maybeSingle();
+
+      if (restaurant) {
+        clientData = restaurant; // treating restaurant as client for display
+      }
+    }
+
+    if (clientData) {
+      if (clientData.nombre) setUserName(clientData.nombre);
 
       const { data: card } = await supabase
         .from('tarjeta_lealtad')
         .select('sellos_aumulados')
-        .eq('cliente_id', client.id)
+        .eq('cliente_id', clientData.id)
         .single();
 
       if (card) setStamps(card.sellos_aumulados);
@@ -58,7 +75,7 @@ export default function Home() {
       const { data: moves } = await supabase
         .from('movimientos')
         .select('*')
-        .eq('cliente_id', client.id)
+        .eq('cliente_id', clientData.id)
         .order('created_at', { ascending: false })
         .limit(10);
 
