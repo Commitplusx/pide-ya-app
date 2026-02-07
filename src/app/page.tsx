@@ -86,8 +86,8 @@ export default function Home() {
         const { data: restaurant } = await supabase
           .from('restaurantes')
           .select('*')
-          .eq('telefono', phoneNumber)
-          .single();
+          .or(`telefono.eq.${phoneNumber},telefono.eq.+52${phoneNumber}`)
+          .maybeSingle();
 
         if (!restaurant) {
           setError("Número no registrado. Pide a tu repartidor que te registre. 🔒");
