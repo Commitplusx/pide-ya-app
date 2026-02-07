@@ -79,7 +79,7 @@ export default function Home() {
         .from('movimientos')
         .select('*')
         .eq('cliente_id', clientData.id)
-        .order('created_at', { ascending: false })
+        .order('fecha', { ascending: false })
         .limit(10);
 
       if (moves) setActivityLog(moves);
