@@ -17,6 +17,16 @@ export default function Home() {
   const [userName, setUserName] = useState<string>("");
   const [activityLog, setActivityLog] = useState<any[]>([]);
 
+  // Auto-login from localStorage on mount
+  useEffect(() => {
+    const savedPhone = localStorage.getItem('pide_ya_session');
+    if (savedPhone) {
+      setPhoneNumber(savedPhone);
+      setViewState("dashboard");
+      fetchUserData(savedPhone);
+    }
+  }, []);
+
   // Real-time Listener (Supabase)
   useEffect(() => {
     if (!phoneNumber) return;
@@ -86,6 +96,20 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    // Clear session
+    localStorage.removeItem('pide_ya_session');
+    
+    // Reset all state
+    setPhoneNumber("");
+    setUserName("");
+    setStamps(0);
+    setActivityLog([]);
+    setViewState("initial");
+    setShowQr(false);
+    setError(null);
+  };
+
   const handleLogin = async () => {
     if (phoneNumber.length < 10) {
       setError("Ingresa un número válido de 10 dígitos");
@@ -117,6 +141,9 @@ export default function Home() {
           return;
         }
       }
+
+      // Save session to localStorage
+      localStorage.setItem('pide_ya_session', phoneNumber);
 
       await fetchUserData(phoneNumber);
       setViewState("dashboard");
@@ -242,17 +269,26 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-8"
             >
-              {/* User Greeting */}
-              <div className="glass-card px-5 py-3 rounded-2xl flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-0.5">Bienvenido</p>
-                  <h2 className="text-xl font-bold text-slate-900 truncate">
-                    {userName || `Usuario ${phoneNumber.substring(0, 3)}...`}
-                  </h2>
+              {/* User Greeting with Logout */}
+              <div className="glass-card px-4 sm:px-5 py-3 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-blue-500/20 flex-shrink-0">
+                    {userName ? userName[0].toUpperCase() : 'U'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-0.5">Bienvenido</p>
+                    <h2 className="text-base sm:text-xl font-bold text-slate-900 truncate">
+                      {userName || `Usuario ${phoneNumber.substring(0, 3)}...`}
+                    </h2>
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-blue-500/20">
-                  {userName ? userName[0].toUpperCase() : 'U'}
-                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 sm:px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
               </div>
 
               <LoyaltyCard stamps={stamps} loading={loading} />
