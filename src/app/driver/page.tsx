@@ -35,12 +35,19 @@ export default function DriverPage() {
             if (searchQuery.length >= 3) {
                 setIsSearching(true);
                 try {
-                    const { data } = await supabase
-                        .from('clientes')
-                        .select('*')
-                        .or(`nombre.ilike.%${searchQuery}%,telefono.ilike.%${searchQuery}%`)
-                        .limit(5);
-                    setSearchResults(data || []);
+                    const searchCondition = `nombre.ilike.%${searchQuery}%,telefono.ilike.%${searchQuery}%`;
+
+                    const [clients, restaurants] = await Promise.all([
+                        supabase.from('clientes').select('id, nombre, telefono').or(searchCondition).limit(5),
+                        supabase.from('restaurantes').select('id, nombre, telefono').or(searchCondition).limit(5)
+                    ]);
+
+                    const combined = [
+                        ...(clients.data || []).map(c => ({ ...c, type: 'CLIENTE' })),
+                        ...(restaurants.data || []).map(r => ({ ...r, type: 'RESTAURANTE' }))
+                    ].slice(0, 5);
+
+                    setSearchResults(combined);
                 } catch (error) {
                     console.error("Search error:", error);
                 } finally {
@@ -92,39 +99,55 @@ export default function DriverPage() {
 
         try {
             let clientId;
+            let finalPhone = cleanPhone;
 
-            // Smart Lookup: Try exact 10 digits OR +52 version
+            // Smart Lookup Logic
+            const searchCondition = `telefono.eq.${cleanPhone},telefono.eq.+52${cleanPhone},telefono.eq.52${cleanPhone},telefono.eq.521${cleanPhone},telefono.eq.+521${cleanPhone}`;
+
+            // 1. Try Client
             const { data: client } = await supabase
                 .from('clientes')
-                .select('id')
-                .or(`telefono.eq.${cleanPhone},telefono.eq.+52${cleanPhone}`)
+                .select('id, telefono')
+                .or(searchCondition)
                 .maybeSingle();
 
             if (client) {
                 clientId = client.id;
+                finalPhone = client.telefono;
             } else {
-                // Determine which format to save new users in. 
-                // If existing users have +52, maybe we should save with +52?
-                // For now, let's just save what they typed (10 digits) to avoid conflicts, or standardise?
-                // Let's standardise to 10 digits for new users unless instructed otherwise.
-                const { data: newClient, error: createError } = await supabase
-                    .from('clientes')
-                    .insert([{ telefono: cleanPhone, nombre: 'Cliente Nuevo' }])
-                    .select('id')
-                    .single();
+                // 2. Try Restaurant
+                const { data: restaurant } = await supabase
+                    .from('restaurantes')
+                    .select('id, telefono')
+                    .or(searchCondition)
+                    .maybeSingle();
 
-                if (createError) throw createError;
-                clientId = newClient?.id;
+                if (restaurant) {
+                    clientId = restaurant.id;
+                    finalPhone = restaurant.telefono;
+                } else {
+                    // Create new CLIENT by default if not found
+                    const { data: newClient, error: createError } = await supabase
+                        .from('clientes')
+                        .insert([{ telefono: cleanPhone, nombre: 'Cliente Nuevo' }])
+                        .select('id')
+                        .single();
+
+                    if (createError) throw createError;
+                    clientId = newClient?.id;
+                }
             }
 
             const isReward = count >= 6;
+
+            // Upsert loyalty card to ensure it exists
             const { error: updateError } = await supabase
                 .from('tarjeta_lealtad')
-                .update({
+                .upsert({
+                    cliente_id: clientId,
                     sellos_aumulados: count,
                     recompensa_disponible: isReward
-                })
-                .eq('cliente_id', clientId);
+                }, { onConflict: 'cliente_id' });
 
             if (updateError) throw updateError;
 
@@ -164,7 +187,7 @@ export default function DriverPage() {
                             <Truck className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="font-black text-xl leading-tight">Driver Panel</h1>
+                            <h1 className="font-black text-xl leading-tight">Panel de Reparto</h1>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                                 <span className="text-xs font-bold text-purple-100">EN LÍNEA</span>
@@ -256,10 +279,15 @@ export default function DriverPage() {
                                             className="w-full text-left px-5 py-4 hover:bg-purple-50 transition-colors flex items-center justify-between group border-b border-slate-50 last:border-0"
                                         >
                                             <div>
-                                                <p className="font-bold text-slate-800 text-sm group-hover:text-purple-700 transition-colors">
-                                                    {client.nombre || "Sin Nombre"}
-                                                </p>
-                                                <p className="text-xs text-slate-400 font-mono tracking-wide">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${client.type === 'RESTAURANTE' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                        {client.type === 'RESTAURANTE' ? 'REST' : 'CTE'}
+                                                    </span>
+                                                    <p className="font-bold text-slate-800 text-sm group-hover:text-purple-700 transition-colors">
+                                                        {client.nombre || "Sin Nombre"}
+                                                    </p>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono tracking-wide mt-0.5">
                                                     {client.telefono}
                                                 </p>
                                             </div>
