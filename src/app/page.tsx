@@ -284,7 +284,7 @@ export default function Home() {
                               {item.tipo === 'STAMP' ? 'Recibiste Puntos' : 'Premio Canjeado'}
                             </p>
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
-                              {new Date(item.created_at).toLocaleDateString('es-MX', {
+                              {new Date(item.fecha).toLocaleDateString('es-MX', {
                                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
                               })}
                             </p>
