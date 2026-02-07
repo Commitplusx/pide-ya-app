@@ -38,11 +38,14 @@ export default function Home() {
   const fetchUserData = async (phone: string) => {
     let clientData: { id: string, nombre: string } | null = null;
 
+    // Create query set for common formats
+    const searchCondition = `telefono.eq.${phone},telefono.eq.+52${phone},telefono.eq.52${phone},telefono.eq.521${phone},telefono.eq.+521${phone}`;
+
     // 1. Try finding in 'clientes'
     const { data: client } = await supabase
       .from('clientes')
       .select('id, nombre')
-      .or(`telefono.eq.${phone},telefono.eq.+52${phone}`)
+      .or(searchCondition)
       .maybeSingle();
 
     if (client) {
@@ -52,7 +55,7 @@ export default function Home() {
       const { data: restaurant } = await supabase
         .from('restaurantes')
         .select('id, nombre')
-        .or(`telefono.eq.${phone},telefono.eq.+52${phone}`)
+        .or(searchCondition)
         .maybeSingle();
 
       if (restaurant) {
@@ -92,10 +95,13 @@ export default function Home() {
     setError(null);
 
     try {
+      // Create query set for common formats
+      const searchCondition = `telefono.eq.${phoneNumber},telefono.eq.+52${phoneNumber},telefono.eq.52${phoneNumber},telefono.eq.521${phoneNumber},telefono.eq.+521${phoneNumber}`;
+
       const { data: existingUser } = await supabase
         .from('clientes')
         .select('*')
-        .or(`telefono.eq.${phoneNumber},telefono.eq.+52${phoneNumber}`)
+        .or(searchCondition)
         .maybeSingle();
 
       // Try restaurants too if client not found
@@ -103,7 +109,7 @@ export default function Home() {
         const { data: restaurant } = await supabase
           .from('restaurantes')
           .select('*')
-          .or(`telefono.eq.${phoneNumber},telefono.eq.+52${phoneNumber}`)
+          .or(searchCondition)
           .maybeSingle();
 
         if (!restaurant) {
